@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
 import webapp2
-import login 
+#import login 
 
 import handlers
-
-from webapp2_extras import auth
 
 config = {}
 config['webapp2_extras.sessions'] = {

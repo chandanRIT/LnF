@@ -6,6 +6,7 @@ import jinja_module
 from table_classes.user import User
   
 from webapp2_extras import sessions
+from webapp2_extras import auth
 
 class BaseHandler(webapp2.RequestHandler):
     def dispatch(self):
@@ -21,6 +22,10 @@ class BaseHandler(webapp2.RequestHandler):
     def session(self):
         # Returns a session using the default cookie key.
         return self.session_store.get_session()
+    
+    @webapp2.cached_property
+    def auth(self):
+        return auth.get_auth()
     
     def render(self, template, **kw):
         self.response.out.write(jinja_module.render_str(template, **kw))
@@ -46,16 +51,25 @@ class BaseHandler(webapp2.RequestHandler):
 class MainHandler(BaseHandler):
     def get(self):
         self.check_loggedin()
+        self.redirect('/welcome')
     
 class SignupHandler(BaseHandler):
     def get(self):
-        super(BaseHandler, self).get()
+        #super(BaseHandler, self).get()
+        self.check_session()
         self.render('signup-form.html')
     
     def post(self):
         username = self.request.get('username')
         password = self.request.get('password')
+        vpassword = self.request.get('vpassword')  
         email = self.request.get('email')
+        
+        params = self.__validate_fields(username, password, vpassword, email)
+        if params :
+            self.render('signup-form.html', **params)
+            return
+        
         #department = self.request.get('department')
         print username
         print password
@@ -75,6 +89,31 @@ class SignupHandler(BaseHandler):
             new_user.put()
             self.session['username'] = username
             self.redirect('/welcome')
+    
+    """
+        Returns a dictionary containing error messages and values for fields to auto-fill the form fields, if there are
+        errors in filling the form, else None
+    """        
+    def __validate_fields(self, username, password, vpassword, email):
+        field_error = False
+        params = dict(username = username, email = email)
+
+        if not utils_module.valid_username(username):
+            params['error_username'] = "Invalid username."
+            field_error = True
+
+        if not utils_module.valid_password(password):
+            params['error_password'] = "Invalid password."
+            field_error = True
+        elif password != vpassword:
+            params['error_verify'] = "Passwords didn't match."
+            field_error = True
+
+        if not utils_module.valid_email(email):
+            params['error_email'] = "Invalid email."
+            field_error = True
+        
+        return params if field_error is True else None
 
 class LoginHandler(BaseHandler):
     def get(self):
@@ -108,5 +147,6 @@ class LogoutHandler(BaseHandler):
     def get(self):
         self.check_loggedin()
         #self.auth.unset_session()
+        #self.auth().unset_session()
         self.session.clear() #not sure if this is the right method
         self.render('logout_page.html')
